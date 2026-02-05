@@ -36,6 +36,9 @@ public class Crawler implements Runnable {
 
             synchronized (lockB1) {
                 this.files.addAll(filesSet);
+
+                // Notify other threads
+                lockB1.notifyAll();
             }
 
         } catch (IOException e) {
@@ -44,17 +47,20 @@ public class Crawler implements Runnable {
 
         }
 
-        // Notify other threads
-        lockB1.notifyAll();
     }
 
+    /**
+     * Restituisce la lista di file nella cartella `dir`
+     */
     public Set<String> listFilesUsingFilesList(String dir) throws IOException {
-        try (Stream<Path> stream = Files.list(Paths.get(dir))) {
-            return stream
-                    .filter(file -> !Files.isDirectory(file))
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .collect(Collectors.toSet());
-        }
+
+        Stream<Path> stream = Files.list(Paths.get(dir));
+
+        // Convert Stream path 2 Set String
+        Set<String> resultSet = stream
+                .map(path -> "" + path.toString()) // Converte Path in String
+                .collect(Collectors.toSet()); // Raccoglie in un Set (rimuove i duplicati)
+
+        return resultSet;
     }
 }

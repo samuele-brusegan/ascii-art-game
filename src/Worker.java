@@ -1,5 +1,4 @@
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,25 +26,26 @@ public class Worker implements Runnable {
     @Override
     public void run() {
         // Get a path from the LinkedList files
-
-        synchronized (lockB1) {
-            while (files.isEmpty()) {
-                try {
-                    lockB1.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+        while (!files.isEmpty()) {
+            synchronized (lockB1) {
+                while (files.isEmpty()) {
+                    try {
+                        lockB1.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
+
+                // Read file
+                String path = files.removeFirst();
+
+                // Extract hidden data
+                Data hiddenData = extractHiddenData(path);
+
+                addToResults(hiddenData);
+
+                lockB1.notifyAll();
             }
-
-            // Read file
-            String path = files.removeFirst();
-
-            // Extract hidden data
-            Data hiddenData = extractHiddenData(path);
-
-            addToResults(hiddenData);
-
-            lockB1.notifyAll();
         }
     }
 
@@ -81,7 +81,7 @@ public class Worker implements Runnable {
                         }
 
                     } catch (IndexOutOfBoundsException e) {
-                        e.printStackTrace();
+                        System.out.println("(notice) IndexOutOfBoundsException in Worker.extractHiddenData");
                     }
                 }
             }
@@ -91,9 +91,21 @@ public class Worker implements Runnable {
         for (int i = 0; i < matrix.size(); i++) {
             for (int j = 0; j < matrix.get(i).size(); j++) {
                 if (Character.isDigit(matrix.get(i).get(j))) {
-                    coordX = i;
-                    coordY = j;
-                    character = matrix.get(i).get(j);
+                    try {
+                        Character c1 = matrix.get(i).get(j);
+                        Character c2 = matrix.get(i).get(j + 1);
+                        Character c3 = matrix.get(i).get(j + 2);
+
+                        if (Character.isDigit(c1) && Character.isDigit(c2) && Character.isDigit(c3)) {
+                            // Somma i 3 numeri
+                            int sum = Character.getNumericValue(c1) + Character.getNumericValue(c2)
+                                    + Character.getNumericValue(c3);
+                            coordX = sum;
+                        }
+
+                    } catch (IndexOutOfBoundsException e) {
+                        System.out.println("(notice) IndexOutOfBoundsException in Worker.extractHiddenData");
+                    }
                 }
             }
         }
@@ -109,13 +121,18 @@ public class Worker implements Runnable {
             }
         }
 
-        return new Data(coordX, coordY, character);
+        Data data = new Data(coordX, coordY, character);
+
+        System.out.println("Data: " + data);
+        return data;
     }
 
     public void addToResults(Data hiddenData) {
         // (synchronized) Add hidden data to LinkedList charBuffer
         synchronized (lockB2) {
             charBuffer.add(hiddenData);
+            System.out.println("Added data: " + hiddenData);
+            lockB2.notifyAll();
         }
     }
 
@@ -123,6 +140,7 @@ public class Worker implements Runnable {
         ArrayList<ArrayList<Character>> matrix = new ArrayList<>();
         BufferedReader br;
         try {
+            System.out.println("Reading file: " + path);
             br = new BufferedReader(new FileReader(path));
             String line;
             while ((line = br.readLine()) != null) {
